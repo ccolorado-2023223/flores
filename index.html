@@ -1,0 +1,303 @@
+<!DOCTYPE html> 
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Per te</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <style>
+    body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Georgia', serif; }
+    canvas { position: absolute; top: 0; left: 0; cursor: grab; }
+    canvas:active { cursor: grabbing; }
+    
+    #text-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: rgba(255, 220, 100, 0.9);
+      font-size: 3rem;
+      font-weight: 300;
+      font-style: italic;
+      letter-spacing: 0.15em;
+      pointer-events: none;
+      z-index: 10;
+      text-align: center;
+      width: 85%;
+      text-shadow: 0 0 30px rgba(255, 200, 0, 0.3);
+      opacity: 0; /* Empezamos en 0 para GSAP */
+      filter: blur(5px); /* Efecto cinemático inicial */
+    }
+
+    #hint {
+      position: absolute;
+      bottom: 20px;
+      width: 100%;
+      text-align: center;
+      color: rgba(255, 220, 100, 0.4);
+      font-size: 0.8rem;
+      letter-spacing: 0.1em;
+      z-index: 5;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="text-overlay"></div>
+  <div id="hint">Gira con el mouse • Agita suavemente para transformar</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.136.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.136.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://unpkg.co/gsap@3/dist/gsap.min.js"></script>
+
+<script>
+/* ================= VALIDACIÓN ================= */
+const nombrePrompt = prompt("Escribe tu primer nombre:");
+if (!nombrePrompt || nombrePrompt.toLowerCase() !== "marcela") {
+  document.body.innerHTML = "<h1 style='margin-top:40vh;color:#ffdc64;text-align:center;font-family:sans-serif'>Este detalle es privado ❤️</h1>";
+  throw new Error("Acceso denegado");
+}
+
+/* ================= CONFIGURACIÓN ================= */
+const totalParticles = 18000;
+const state = {
+  mode: 'intro', 
+  isChanging: false
+};
+
+const overlay = document.getElementById('text-overlay');
+const introMessages = [
+  "Hola, Marcela...",
+  "Hay personas que iluminan los días",
+  "con tan solo existir...",
+  "Hoy simplemente quería recordarte",
+  "que tú eres una de ellas.",
+  "Para ti, estas flores amarillas."
+];
+
+/* ================= ESCENA ================= */
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 10000);
+camera.position.set(0, 200, 1800);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+
+/* ================= CONTROLES (NUEVO) ================= */
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.5;
+controls.enablePan = false;
+controls.minDistance = 1000;
+controls.maxDistance = 3000;
+
+/* ================= ATRIBUTOS DE PARTÍCULAS ================= */
+const positions = new Float32Array(totalParticles * 3);
+const bouquetTargets = new Float32Array(totalParticles * 3);
+const nameTargets = new Float32Array(totalParticles * 3);
+const colors = new Float32Array(totalParticles * 3);
+const bouquetColors = new Float32Array(totalParticles * 3);
+const nameColors = new Float32Array(totalParticles * 3);
+
+const colorYellow = new THREE.Color(0xFFDC64);
+const colorGold = new THREE.Color(0xFFB000);
+const colorGreen = new THREE.Color(0x0A3D0A);
+
+for (let i = 0; i < totalParticles * 3; i++) {
+  positions[i] = (Math.random() - 0.5) * 6000;
+}
+
+/* ================= GENERAR FORMA: RAMO ================= */
+function generateBouquetData() {
+  let pIdx = 0;
+  const numFlowers = 10;
+  const particlesPerFlower = 1400;
+
+  for (let f = 0; f < numFlowers; f++) {
+    const offsetX = (Math.random() - 0.5) * 900;
+    const offsetY = 150 + (Math.random() * 550);
+    const offsetZ = (Math.random() - 0.5) * 500;
+
+    for (let i = 0; i < particlesPerFlower; i++) {
+      const angle = i * 137.508 * (Math.PI / 180);
+      const radius = 4.2 * Math.sqrt(i);
+      const x = offsetX + radius * Math.cos(angle);
+      const y = offsetY + radius * Math.sin(angle);
+      const z = offsetZ + (Math.random() - 0.5) * 40;
+
+      bouquetTargets[pIdx * 3] = x;
+      bouquetTargets[pIdx * 3 + 1] = y;
+      bouquetTargets[pIdx * 3 + 2] = z;
+
+      const c = colorYellow.clone().lerp(colorGold, Math.random());
+      bouquetColors[pIdx * 3] = c.r;
+      bouquetColors[pIdx * 3 + 1] = c.g;
+      bouquetColors[pIdx * 3 + 2] = c.b;
+      pIdx++;
+    }
+
+    const stemParts = 400;
+    for (let j = 0; j < stemParts; j++) {
+      const t = j / stemParts;
+      bouquetTargets[pIdx * 3] = offsetX * (1 - t) + Math.sin(t * 8) * 20;
+      bouquetTargets[pIdx * 3 + 1] = offsetY * (1 - t) - 1000 * t;
+      bouquetTargets[pIdx * 3 + 2] = offsetZ * (1 - t);
+      bouquetColors[pIdx * 3] = colorGreen.r;
+      bouquetColors[pIdx * 3 + 1] = colorGreen.g;
+      bouquetColors[pIdx * 3 + 2] = colorGreen.b;
+      pIdx++;
+    }
+  }
+  for (; pIdx < totalParticles; pIdx++) {
+    bouquetTargets[pIdx * 3] = (Math.random() - 0.5) * 5000;
+    bouquetTargets[pIdx * 3 + 1] = (Math.random() - 0.5) * 5000;
+    bouquetTargets[pIdx * 3 + 2] = -1500;
+    bouquetColors[pIdx * 3] = 1; bouquetColors[pIdx * 3 + 1] = 0.9; bouquetColors[pIdx * 3 + 2] = 0.5;
+  }
+}
+
+/* ================= GENERAR FORMA: NOMBRE ================= */
+function generateNameData() {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = 2400;
+  canvas.height = 800;
+  ctx.fillStyle = "white";
+  ctx.font = "bold 380px serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("MARCELA", canvas.width / 2, canvas.height / 2);
+
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  let pIdx = 0;
+  for (let y = 0; y < canvas.height; y += 4) {
+    for (let x = 0; x < canvas.width; x += 4) {
+      const alpha = data[(y * canvas.width + x) * 4 + 3];
+      if (alpha > 150 && pIdx < totalParticles) {
+        nameTargets[pIdx * 3] = (x - canvas.width / 2) * 1.4;
+        nameTargets[pIdx * 3 + 1] = (-y + canvas.height / 2) * 1.4;
+        nameTargets[pIdx * 3 + 2] = (Math.random() - 0.5) * 50;
+        nameColors[pIdx * 3] = colorYellow.r;
+        nameColors[pIdx * 3 + 1] = colorYellow.g;
+        nameColors[pIdx * 3 + 2] = colorYellow.b;
+        pIdx++;
+      }
+    }
+  }
+  for (; pIdx < totalParticles; pIdx++) {
+    nameTargets[pIdx * 3] = (Math.random() - 0.5) * 7000;
+    nameTargets[pIdx * 3 + 1] = (Math.random() - 0.5) * 4000;
+    nameTargets[pIdx * 3 + 2] = -2500;
+  }
+}
+
+generateBouquetData();
+generateNameData();
+
+const geometry = new THREE.BufferGeometry();
+geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+const material = new THREE.PointsMaterial({
+  size: 3.8,
+  vertexColors: true,
+  transparent: true,
+  opacity: 0,
+  blending: THREE.AdditiveBlending
+});
+
+const points = new THREE.Points(geometry, material);
+scene.add(points);
+
+/* ================= TRANSICIÓN CINEMÁTICA ================= */
+function transitionTo(targetMode) {
+  if (state.isChanging) return;
+  state.isChanging = true;
+  state.mode = targetMode;
+
+  const targetPositions = targetMode === 'bouquet' ? bouquetTargets : nameTargets;
+  const targetColors = targetMode === 'bouquet' ? bouquetColors : nameColors;
+
+  gsap.to(material, { opacity: 0.8, duration: 3 });
+
+  for (let i = 0; i < totalParticles; i++) {
+    gsap.to(positions, {
+      [i * 3]: targetPositions[i * 3],
+      [i * 3 + 1]: targetPositions[i * 3 + 1],
+      [i * 3 + 2]: targetPositions[i * 3 + 2],
+      duration: 2.5 + Math.random() * 2,
+      ease: "expo.inOut"
+    });
+
+    gsap.to(colors, {
+      [i * 3]: targetColors[i * 3],
+      [i * 3 + 1]: targetColors[i * 3 + 1],
+      [i * 3 + 2]: targetColors[i * 3 + 2],
+      duration: 3,
+      onComplete: () => { if(i === totalParticles - 1) state.isChanging = false; }
+    });
+  }
+}
+
+/* ================= INTRO CINEMÁTICA ================= */
+async function runIntro() {
+  for (const msg of introMessages) {
+    overlay.innerHTML = msg;
+    // Aparece con desenfoque
+    gsap.to(overlay, { opacity: 1, filter: 'blur(0px)', duration: 1.5, ease: "power2.out" });
+    await new Promise(r => setTimeout(r, 3500));
+    // Desaparece con desenfoque
+    gsap.to(overlay, { opacity: 0, filter: 'blur(10px)', duration: 1.2, ease: "power2.in" });
+    await new Promise(r => setTimeout(r, 1200));
+  }
+  transitionTo('bouquet');
+}
+
+/* ================= MOVIMIENTO SUAVE ================= */
+let lastMouse = { x: 0, y: 0 };
+window.addEventListener('mousemove', (e) => {
+  const delta = Math.sqrt(Math.pow(e.clientX - lastMouse.x, 2) + Math.pow(e.clientY - lastMouse.y, 2));
+  
+  // Umbral reducido (150) para que no sea tan brusco
+  if (delta > 150 && state.mode !== 'intro' && !state.isChanging) {
+    transitionTo(state.mode === 'bouquet' ? 'name' : 'bouquet');
+  }
+  lastMouse = { x: e.clientX, y: e.clientY };
+});
+
+/* ================= BUCLE DE ANIMACIÓN ================= */
+function animate() {
+  requestAnimationFrame(animate);
+  
+  const time = Date.now() * 0.001;
+  controls.update(); // Mantiene la rotación suave
+  
+  if (!state.isChanging) {
+    const posArray = geometry.attributes.position.array;
+    for (let i = 0; i < totalParticles; i++) {
+      // Movimiento de "respiración" para las flores
+      posArray[i * 3 + 1] += Math.sin(time * 0.5 + i * 0.1) * 0.2;
+    }
+  }
+
+  geometry.attributes.position.needsUpdate = true;
+  geometry.attributes.color.needsUpdate = true;
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+animate();
+runIntro();
+
+</script>
+</body>
+</html>
