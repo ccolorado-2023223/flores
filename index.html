@@ -52,9 +52,12 @@
   <script src="https://unpkg.co/gsap@3/dist/gsap.min.js"></script>
 
 <script>
-/* ================= VALIDACIÓN ================= */
+/* ================= VALIDACIÓN ACTUALIZADA ================= */
 const nombrePrompt = prompt("Escribe tu primer nombre:");
-if (!nombrePrompt || nombrePrompt.toLowerCase() !== "marcela") {
+// Quitamos espacios y pasamos a minúsculas
+const nombreValidado = nombrePrompt ? nombrePrompt.trim().toLowerCase() : "";
+
+if (nombreValidado !== "marcela") {
   document.body.innerHTML = "<h1 style='margin-top:40vh;color:#ffdc64;text-align:center;font-family:sans-serif'>Este detalle es privado ❤️</h1>";
   throw new Error("Acceso denegado");
 }
@@ -258,14 +261,12 @@ async function runIntro() {
 }
 
 /* ================= EVENTOS DE INTERACCIÓN ================= */
-// 1. Detección de Doble Clic (Nuevo)
 window.addEventListener('dblclick', () => {
   if (state.mode !== 'intro' && !state.isChanging) {
     transitionTo(state.mode === 'bouquet' ? 'name' : 'bouquet');
   }
 });
 
-// 2. Detección de Movimiento
 let lastMouse = { x: 0, y: 0 };
 window.addEventListener('mousemove', (e) => {
   const delta = Math.sqrt(Math.pow(e.clientX - lastMouse.x, 2) + Math.pow(e.clientY - lastMouse.y, 2));
@@ -275,7 +276,6 @@ window.addEventListener('mousemove', (e) => {
   lastMouse = { x: e.clientX, y: e.clientY };
 });
 
-// 3. Soporte Táctil (Doble toque para móvil)
 let lastTouchTime = 0;
 window.addEventListener('touchstart', (e) => {
   const currentTime = new Date().getTime();
