@@ -24,8 +24,8 @@
       text-align: center;
       width: 85%;
       text-shadow: 0 0 30px rgba(255, 200, 0, 0.3);
-      opacity: 0; /* Empezamos en 0 para GSAP */
-      filter: blur(5px); /* Efecto cinemático inicial */
+      opacity: 0;
+      filter: blur(5px);
     }
 
     #hint {
@@ -38,13 +38,14 @@
       letter-spacing: 0.1em;
       z-index: 5;
       pointer-events: none;
+      transition: opacity 1s;
     }
   </style>
 </head>
 <body>
 
   <div id="text-overlay"></div>
-  <div id="hint">Gira con el mouse • Agita suavemente para transformar</div>
+  <div id="hint">Gira • Agita el mouse • Doble clic para transformar</div>
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.136.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.136.0/examples/js/controls/OrbitControls.js"></script>
@@ -85,7 +86,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 document.body.appendChild(renderer.domElement);
 
-/* ================= CONTROLES (NUEVO) ================= */
+/* ================= CONTROLES ================= */
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
@@ -213,7 +214,7 @@ const material = new THREE.PointsMaterial({
 const points = new THREE.Points(geometry, material);
 scene.add(points);
 
-/* ================= TRANSICIÓN CINEMÁTICA ================= */
+/* ================= TRANSICIÓN ================= */
 function transitionTo(targetMode) {
   if (state.isChanging) return;
   state.isChanging = true;
@@ -243,43 +244,59 @@ function transitionTo(targetMode) {
   }
 }
 
-/* ================= INTRO CINEMÁTICA ================= */
+/* ================= INTRO ================= */
 async function runIntro() {
   for (const msg of introMessages) {
     overlay.innerHTML = msg;
-    // Aparece con desenfoque
     gsap.to(overlay, { opacity: 1, filter: 'blur(0px)', duration: 1.5, ease: "power2.out" });
     await new Promise(r => setTimeout(r, 3500));
-    // Desaparece con desenfoque
     gsap.to(overlay, { opacity: 0, filter: 'blur(10px)', duration: 1.2, ease: "power2.in" });
     await new Promise(r => setTimeout(r, 1200));
   }
   transitionTo('bouquet');
+  document.getElementById('hint').style.opacity = "1";
 }
 
-/* ================= MOVIMIENTO SUAVE ================= */
+/* ================= EVENTOS DE INTERACCIÓN ================= */
+// 1. Detección de Doble Clic (Nuevo)
+window.addEventListener('dblclick', () => {
+  if (state.mode !== 'intro' && !state.isChanging) {
+    transitionTo(state.mode === 'bouquet' ? 'name' : 'bouquet');
+  }
+});
+
+// 2. Detección de Movimiento
 let lastMouse = { x: 0, y: 0 };
 window.addEventListener('mousemove', (e) => {
   const delta = Math.sqrt(Math.pow(e.clientX - lastMouse.x, 2) + Math.pow(e.clientY - lastMouse.y, 2));
-  
-  // Umbral reducido (150) para que no sea tan brusco
-  if (delta > 150 && state.mode !== 'intro' && !state.isChanging) {
+  if (delta > 200 && state.mode !== 'intro' && !state.isChanging) {
     transitionTo(state.mode === 'bouquet' ? 'name' : 'bouquet');
   }
   lastMouse = { x: e.clientX, y: e.clientY };
 });
 
+// 3. Soporte Táctil (Doble toque para móvil)
+let lastTouchTime = 0;
+window.addEventListener('touchstart', (e) => {
+  const currentTime = new Date().getTime();
+  const tapLength = currentTime - lastTouchTime;
+  if (tapLength < 500 && tapLength > 0) {
+    if (state.mode !== 'intro' && !state.isChanging) {
+      transitionTo(state.mode === 'bouquet' ? 'name' : 'bouquet');
+    }
+  }
+  lastTouchTime = currentTime;
+});
+
 /* ================= BUCLE DE ANIMACIÓN ================= */
 function animate() {
   requestAnimationFrame(animate);
-  
   const time = Date.now() * 0.001;
-  controls.update(); // Mantiene la rotación suave
+  controls.update();
   
   if (!state.isChanging) {
     const posArray = geometry.attributes.position.array;
     for (let i = 0; i < totalParticles; i++) {
-      // Movimiento de "respiración" para las flores
       posArray[i * 3 + 1] += Math.sin(time * 0.5 + i * 0.1) * 0.2;
     }
   }
